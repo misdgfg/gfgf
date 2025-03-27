@@ -1,0 +1,208 @@
+local ServerStorage = game:GetService("ServerStorage")
+local PhysicsService = game:GetService("PhysicsService")
+
+
+local mob = {}
+
+function mob.Move(mob, map, movingToVal)
+	local humanoid = mob:WaitForChild("Humanoid")
+	local waypoints = map.Waypoints
+	local rng = math.random(1,3)
+	
+	for waypoint=1, #waypoints:GetChildren() do
+		if mob.PrimaryPart == nil or mob == nil then return end
+		mob.MovingTo.Value = waypoint
+
+		local waypointDistance = (waypoints[waypoint].Position - waypoints[waypoint].Position).Magnitude
+		local mobPosVector = mob.PrimaryPart.Position * Vector3.new(1, 0, 1)
+		local waypointPosVector = waypoints[waypoint].Position * Vector3.new(1, 0, 1)
+		local mobDistance = (mobPosVector - waypointPosVector).Magnitude
+		local reached = false
+		repeat
+			wait(0.05)
+			if not humanoid or humanoid.Health <= 0 then return end
+			humanoid:MoveTo(waypointPosVector)
+			mobPosVector = mob.PrimaryPart.Position * Vector3.new(1, 0, 1)
+			waypointPosVector = waypoints[waypoint].Position * Vector3.new(1, 0, 1)
+			mobDistance = (mobPosVector - waypointPosVector).Magnitude
+	                                          		if mobDistance <= 0.3 then
+				reached = true
+			end
+		until reached == true
+	end
+
+	mob:Destroy()
+	map.Base.Humanoid:TakeDamage(humanoid.Health)
+end
+
+
+function mob.Spawn(name, quantity, map)
+	local mobExists = ServerStorage.Mobs:FindFirstChild(name)
+	
+	if mobExists then
+		for i=1, quantity do
+			task.wait(0.5)
+			local newMob = mobExists:Clone()
+			newMob.HumanoidRootPart.CFrame = map.Start.CFrame
+			newMob.Parent = workspace.Mobs
+			newMob.HumanoidRootPart:SetNetworkOwner(nil)
+
+			mob.SetStatus(newMob)
+			local statusEffects = newMob:WaitForChild("StatusEffects")
+
+			local movingTo = Instance.new("IntValue")
+			movingTo.Name = "MovingTo"
+			movingTo.Value = 1
+			movingTo.Parent = newMob
+
+			for i, object in ipairs(newMob:GetDescendants()) do
+				if object:IsA("BasePart") then
+					object.CollisionGroup = "Mob"
+				end
+			end
+
+			statusEffects.SlownessDuration:GetPropertyChangedSignal("Value"):Connect(function()
+				coroutine.wrap(mob.UpdateStatus)(newMob)
+			end)
+
+
+			newMob.Humanoid.Died:Connect(function()
+				task.wait(0.2)
+				newMob:Destroy()
+				
+			end)
+
+			coroutine.wrap(mob.Move)(newMob,map)
+			
+		end
+	else
+		warn("Requested mob does not exist:", name)
+	end
+end
+
+function mob.SetStatus(chosenMob)
+	local humanoid = chosenMob:WaitForChild("Humanoid")
+	local statusEffects = chosenMob:FindFirstChild("StatusEffects") or Instance.new("Folder")
+	statusEffects.Name = "StatusEffects"
+	statusEffects.Parent = chosenMob
+	
+	local originalSpeed = statusEffects:FindFirstChild("OriginalSpeed") or Instance.new("NumberValue")
+	originalSpeed.Name = "OriginalSpeed"
+	originalSpeed.Value = chosenMob.Humanoid.WalkSpeed
+	originalSpeed.Parent = statusEffects
+	
+	local slownessBool = statusEffects:FindFirstChild("IsSlowed") or Instance.new("BoolValue")
+	slownessBool.Name = "IsSlowed"
+	slownessBool.Value = false
+	slownessBool.Parent = statusEffects
+	
+	local slownessDuration = statusEffects:FindFirstChild("SlownessDuration") or Instance.new("NumberValue")
+	slownessDuration.Name = "SlownessDuration"
+	slownessDuration.Value = 0
+	slownessDuration.Parent = statusEffects
+end
+
+function mob.UpdateStatus(chosenMob)
+ local mobHumanoid = chosenMob:FindFirstChild("Humanoid")
+ local statusEffects = chosenMob:FindFirstChild("StatusEffects")
+ if not statusEffects then return end
+		
+	local currentSlownessDuration = statusEffects:FindFirstChild("SlownessDuration")
+	local isSlowed = statusEffects:FindFirstChild("IsSlowed")
+	local originalSpeed = statusEffects:FindFirstChild("OriginalSpeed")
+	
+	if not currentSlownessDuration or not isSlowed then return end
+	
+	if isSlowed.Value == false then
+		isSlowed.Value = true
+		repeat task.wait(1)
+			
+			if not currentSlownessDuration then return end
+			if not isSlowed then return end
+			
+			currentSlownessDuration.Value -= 1
+		until currentSlownessDuration.Value <= 0 or mobHumanoid == nil or chosenMob == nil or isSlowed == nil
+		isSlowed.Value = false
+		mobHumanoid.WalkSpeed = originalSpeed.Value
+		return
+	end
+end
+
+function mob.Move2(mob, map, movingToVal)
+	local humanoid = mob:WaitForChild("Humanoid")
+	local waypoints = map.Waypoints
+
+	for waypoint=movingToVal, #waypoints:GetChildren() do
+		if mob.PrimaryPart == nil or mob == nil then return end
+		mob.MovingTo.Value = waypoint
+
+		local waypointDistance = (waypoints[waypoint].Position - waypoints[waypoint].Position).Magnitude
+		local mobPosVector = mob.PrimaryPart.Position * Vector3.new(1, 0, 1)
+		local waypointPosVector = waypoints[waypoint].Position * Vector3.new(1, 0, 1)
+		local mobDistance = (mobPosVector - waypointPosVector).Magnitude
+		local reached = false
+
+		repeat
+			task.wait(0.05)
+			if not humanoid or humanoid.Health <= 0 then return end
+			humanoid:MoveTo(waypointPosVector)
+			mobPosVector = mob.PrimaryPart.Position * Vector3.new(1, 0, 1)
+			waypointPosVector = waypoints[waypoint].Position * Vector3.new(1, 0, 1)
+			mobDistance = (mobPosVector - waypointPosVector).Magnitude
+			if mobDistance <= 0.7 then
+				reached = true
+			end
+		until reached == true
+	end
+
+	mob:Destroy()
+	map.Base.Humanoid:TakeDamage(humanoid.Health)
+end
+
+function mob.Spawn2(name, quantity, map, cframe, movingToVal)
+	local mobExists = ServerStorage.Mobs:FindFirstChild(name)
+
+	if mobExists then
+		for i=1, quantity do
+			task.wait(0.5)
+			local newMob = mobExists:Clone()
+			newMob.HumanoidRootPart.CFrame = cframe
+			newMob.Parent = workspace.Mobs
+			newMob.HumanoidRootPart:SetNetworkOwner(nil)
+
+			mob.SetStatus(newMob)
+			local statusEffects = newMob:WaitForChild("StatusEffects")
+
+			local movingTo = Instance.new("IntValue")
+			movingTo.Name = "MovingTo"
+			movingTo.Value = movingToVal
+			movingTo.Parent = newMob
+
+			for i, object in ipairs(newMob:GetDescendants()) do
+				if object:IsA("BasePart") then
+					object.CollisionGroup = "Mob"
+				end
+			end
+
+			statusEffects.SlownessDuration:GetPropertyChangedSignal("Value"):Connect(function()
+				coroutine.wrap(mob.UpdateStatus)(newMob)
+			end)
+
+
+			newMob.Humanoid.Died:Connect(function()
+				task.wait(0.2)
+				newMob:Destroy()
+			end)
+
+
+			coroutine.wrap(mob.Move2)(newMob,map,movingToVal)
+		end
+
+	else
+		warn("Requested mob does not exist:", name)
+	end
+end
+
+
+
+return mob
